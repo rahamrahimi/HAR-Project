@@ -1,0 +1,72 @@
+---
+title: "Human Activity Recognition Project"
+author: "Reza Rahimi"
+date: "June 11, 2017"
+output: html_document
+---
+
+## Introduction 
+
+Using of personal devices such as Fitbit for monitoring personal activity performance are getting more popular. As of a part of current project, the accelerometer reading from 6 research study participants are given. These data are recorded from multiple positions including rom accelerometers on the belt, forearm, arm, and dumbell. The training data consists of accelerometer data and a label identifying the quality of the activity the participant was doing the testing data consists of accelerometer data without the identifying label. The main goal is predicting identifying label for test data based on the training data.
+
+Detailed approach to achive the target:
+
+#Initial Analysis
+Loading required libraries, reading data, removing NA and ZV varibales
+```{r}
+install.packages("caret", repos = "http://cran.us.r-project.org")
+install.packages("e1071", repos = "http://cran.us.r-project.org")
+library(e1071)
+library(caret)
+ptrain <- read.csv("pml-training.csv")
+ptest <- read.csv("pml-testing.csv")
+set.seed(10)
+inTrain <- createDataPartition(y=ptrain$classe, p=0.7, list=F)
+ptrain1 <- ptrain[inTrain, ]
+ptrain2 <- ptrain[-inTrain, ]
+nzv <- nearZeroVar(ptrain1)
+ptrain1 <- ptrain1[, -nzv]
+ptrain2 <- ptrain2[, -nzv]
+mostlyNA <- sapply(ptrain1, function(x) mean(is.na(x))) > 0.95
+ptrain1 <- ptrain1[, mostlyNA==F]
+ptrain2 <- ptrain2[, mostlyNA==F]
+ptrain1 <- ptrain1[, -(1:5)]
+ptrain2 <- ptrain2[, -(1:5)]
+```
+
+# Modeling & Evaluation
+Modeling has been performed by Random Forest fitting training data
+```{r}
+fitControl <- trainControl(method="cv", number=3, verboseIter=F)
+fit <- train(classe ~ ., data=ptrain1, method="rf", trControl=fitControl)
+fit$finalModel
+preds <- predict(fit, newdata=ptrain2)
+confusionMatrix(ptrain2$classe, preds)
+
+#Evaluating model based on whole training set
+nzv <- nearZeroVar(ptrain)
+ptrain <- ptrain[, -nzv]
+ptest <- ptest[, -nzv]
+mostlyNA <- sapply(ptrain, function(x) mean(is.na(x))) > 0.95
+ptrain <- ptrain[, mostlyNA==F]
+ptest <- ptest[, mostlyNA==F]
+ptrain <- ptrain[, -(1:5)]
+ptest <- ptest[, -(1:5)]
+fitControl <- trainControl(method="cv", number=3, verboseIter=F)
+fit <- train(classe ~ ., data=ptrain, method="rf", trControl=fitControl)
+```
+
+#Prediction of Identifying Labels Using The Train Model on the Test Data
+```{r}
+preds <- predict(fit, newdata=ptest)
+preds <- as.character(preds)
+pml_write_files <- function(x) {
+    n <- length(x)
+    for(i in 1:n) {
+        filename <- paste0("problem_id_", i, ".txt")
+        write.table(x[i], file=filename, quote=F, row.names=F, col.names=F)
+    }
+}
+pml_write_files(preds)
+```
+
